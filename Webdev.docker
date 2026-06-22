@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NexusRAG — Website Chatbot Platform</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/inter@5.0.0/index.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/jetbrains-mono@5.0.0/index.css"/>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', 'sans-serif'],
+          mono: ['JetBrains Mono', 'monospace']
+        },
+        colors: {
+          brand: {
+            50:  '#eef4ff',
+            100: '#dbe6ff',
+            200: '#bfd2ff',
+            300: '#93b2ff',
+            400: '#6085ff',
+            500: '#3a5efc',
+            600: '#2541f1',
+            700: '#1e32d6',
+            800: '#1e2dad',
+            900: '#1e2c88',
+          }
+        },
+        animation: {
+          'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          'fade-in': 'fadeIn 0.4s ease-out',
+          'slide-up': 'slideUp 0.4s ease-out',
+          'shimmer': 'shimmer 2s linear infinite',
+        },
+        keyframes: {
+          fadeIn: { '0%': {opacity:0}, '100%': {opacity:1} },
+          slideUp: { '0%': {opacity:0, transform:'translateY(10px)'}, '100%': {opacity:1, transform:'translateY(0)'} },
+          shimmer: { '0%': {backgroundPosition:'-1000px 0'}, '100%': {backgroundPosition:'1000px 0'} },
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html, body { height: 100%; }
+  body { font-family: 'Inter', sans-serif; background: #0a0a0f; color: #e5e7eb; overflow: hidden; }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #3a3a4a; }
+  .glass { background: rgba(18, 18, 28, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.06); }
+  .glass-light { background: rgba(255,255,255,0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.06); }
+  .gradient-text { background: linear-gradient(135deg, #6085ff 0%, #a855f7 50%, #ec4899 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .gradient-border { position: relative; }
+  .gradient-border::before { content:''; position:absolute; inset:0; padding:1px; border-radius: inherit; background: linear-gradient(135deg, #6085ff, #a855f7, #ec4899); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events:none; }
+  .shimmer-bg { background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%); background-size: 1000px 100%; animation: shimmer 2s linear infinite; }
+  .typing-dot { animation: typingBounce 1.4s infinite ease-in-out both; }
+  .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+  .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+  @keyframes typingBounce { 0%, 80%, 100% { transform: scale(0.6); opacity:0.5; } 40% { transform: scale(1); opacity:1; } }
+  .noise { position: fixed; inset: 0; pointer-events:none; opacity:0.03; z-index: 1; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  .glow { box-shadow: 0 0 40px -10px rgba(96,133,255,0.4); }
+  .chat-bubble-user { background: linear-gradient(135deg, #3a5efc 0%, #6085ff 100%); }
+  .chat-bubble-ai { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+  .source-chip { transition: all 0.2s ease; }
+  .source-chip:hover { transform: translateY(-1px); background: rgba(96,133,255,0.15); border-color: rgba(96,133,255,0.4); }
+  .progress-ring { transform: rotate(-90deg); }
+  .progress-ring-circle { transition: stroke-dashoffset 0.5s ease; }
+  .nav-item { transition: all 0.2s ease; }
+  .nav-item:hover { background: rgba(255,255,255,0.04); }
+  .nav-item.active { background: linear-gradient(90deg, rgba(96,133,255,0.15), rgba(96,133,255,0)); border-left: 2px solid #6085ff; }
+  input, textarea { color-scheme: dark; }
+  .fade-mask { mask-image: linear-gradient(to bottom, transparent, black 16px, black calc(100% - 16px), transparent); }
+  .kbd { font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 2px 6px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; color: #9ca3af; }
+</style>
+</head>
+<body class="antialiased">
+<div class="noise"></div>
+
+<!-- ============ AUTH SCREEN ============ -->
+<div id="auth-screen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950">
+  <div class="absolute inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute top-1/4 -left-20 w-96 h-96 bg-brand-500/20 rounded-full blur-3xl"></div>
+    <div class="absolute bottom-1/4 -right-20 w-96 h96 h-96 bg-purple-500/20 rounded-full blur-3xl"></div>
+  </div>
+  <div class="relative w-full max-w-md">
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center gap-2 mb-4">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center glow">
+          <i data-lucide="sparkles" class="w-5 h-5 text-white"></i>
+        </div>
+        <span class="text-2xl font-bold gradient-text">NexusRAG</span>
+      </div>
+      <p class="text-slate-400 text-sm">Production-ready RAG chatbot for any website</p>
+    </div>
+
+    <div class="glass rounded-2xl p-8">
+      <div class="flex gap-1 p-1 bg-slate-900/60 rounded-lg mb-6">
+        <button id="tab-login" class="flex-1 py-2 text-sm font-medium rounded-md bg-slate-800 text-white">Sign In</button>
+        <button id="tab-register" class="flex-1 py-2 text-sm font-medium rounded-md text-slate-400">Sign Up</button>
+      </div>
+
+      <form id="auth-form" class="space-y-4">
+        <div id="name-field" class="hidden">
+          <label class="block text-xs font-medium text-slate-400 mb-1.5">Full Name</label>
+          <input type="text" placeholder="Ada Lovelace" class="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-800 rounded-lg text-sm focus:outline-none focus:border-brand-500 transition"/>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1.5">Email</label>
+          <input type="email" value="demo@nexusrag.ai" class="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-800 rounded-lg text-sm focus:outline-none focus:border-brand-500 transition"/>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1.5">Password</label>
+          <input type="password" value="••••••••" class="w-full px-4 py-2.5 bg-slate-900/60 border border-slate-800 rounded-lg text-sm focus:outline-none focus:border-brand-500 transition"/>
+        </div>
+        <button type="submit" class="w-full py-2.5 bg-gradient-to-r from-brand-500 to-purple-600 text-white font-medium rounded-lg text-sm hover:opacity-90 transition glow">
+          <span id="auth-btn-text">Sign In</span>
+        </button>
+      </form>
+
+      <div class="mt-6 flex items-center gap-3">
+        <div class="flex-1 h-px bg-slate-800"></div>
+        <span class="text-xs text-slate-500">OR</span>
+        <div class="flex-1 h-px bg-slate-800"></div>
+      </div>
+
+      <div class="mt-4 grid grid-cols-2 gap-3">
+        <button class="py-2 bg-slate-900/60 border border-slate-800 rounded-lg text-sm hover:bg-slate-800/60 transition flex items-center justify-center gap-2">
+          <i data-lucide="github" class="w-4 h-4"></i> GitHub
+        </button>
+        <button class="py-2 bg-slate-900/60 border border-slate-800 rounded-lg text-sm hover:bg-slate-800/60 transition flex items-center justify-center gap-2">
+          <i data-lucide="mail" class="w-4 h-4"></i> Google
+        </button>
+      </div>
+
+      <p class="text-center text-xs text-slate-500 mt-6">Protected by JWT · Rate limited · SOC2 compliant</p>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MAIN APP ============ -->
+<div id="app" class="hidden h-screen flex">
+
+  <!-- SIDEBAR -->
+  <aside class="w-64 bg-slate-950/80 border-r border-slate-800/60 flex flex-col">
+    <div class="p-4 border-b border-slate-800/60">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center">
+          <i data-lucide="sparkles" class="w-4 h-4 text-white"></i>
+        </div>
+        <span class="font-bold gradient-text">NexusRAG</span>
+        <span class="ml-auto text-[10px] px-1.5 py-0.5 bg-brand-500/20 text-brand-300 rounded font-mono">v2.1</span>
+      </div>
+    </div>
+
+    <nav class="flex-1 p-2 space-y-0.5 overflow-y-auto scrollbar-thin">
+      <div class="px-3 py-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Workspace</div>
+      <button data-view="chat" class="nav-item active w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300">
+        <i data-lucide="message-square" class="w-4 h-4"></i> Chat
+      </button>
+      <button data-view="ingest" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300">
+        <i data-lucide="globe" class="w-4 h-4"></i> Ingest Website
+      </button>
+      <button data-view="documents" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300">
+        <i data-lucide="file-text" class="w-4 h-4"></i> Documents
+        <span class="ml-auto text-[10px] px-1.5 py-0.5 bg-slate-800 rounded font-mono" id="doc-count">3</span>
+      </button>
+      <button data-view="analytics" class="nav-item w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300">
+        <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Analytics
+      </button>
+
+      <div class="px-3 py-2 mt-4 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">History</div>
+      <div id="chat-history" class="space-y-0.5"></div>
+    </nav>
+
+    <div class="p-3 border-t border-slate-800/60">
+      <div class="glass-light rounded-lg p-3 mb-3">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-slate-300">API Usage</span>
+          <span class="text-[10px] text-slate-500 font-mono">2,341 / 10,000</span>
+        </div>
+        <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+          <div class="h-full bg-gradient-to-r from-brand-500 to-purple-500 rounded-full" style="width: 23%"></div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500 to-orange-500 flex items-center justify-center text-xs font-bold text-white">DL</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-medium text-slate-200 truncate">Demo User</div>
+          <div class="text-[10px] text-slate-500 truncate">demo@nexusrag.ai</div>
+        </div>
+        <button id="logout-btn" class="p-1.5 hover:bg-slate-800 rounded-md text-slate-400">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="flex-1 flex flex-col bg-slate-950/40 relative overflow-hidden">
+
+    <!-- ===== CHAT VIEW ===== -->
+    <div id="view-chat" class="view flex-1 flex flex-col">
+      <!-- Top bar -->
+      <header class="h-14 border-b border-slate-800/60 flex items-center px-5 gap-4 glass">
+        <div class="flex items-center gap-2">
+          <i data-lucide="message-square" class="w-4 h-4 text-brand-400"></i>
+          <h1 class="font-semibold text-sm">Chat with your knowledge base</h1>
+        </div>
+        <div class="flex-1"></div>
+        <div class="flex items-center gap-2">
+          <select id="kb-select" class="text-xs bg-slate-900 border border-slate-800 rounded-md px-2 py-1.5 focus:outline-none focus:border-brand-500">
+            <option>All Sources (3 indexed)</option>
+            <option>stripe.com/docs</option>
+            <option>openai.com</option>
+            <option>langchain-ai.pdf</option>
+          </select>
+          <button id="export-btn" class="p-2 hover:bg-slate-800 rounded-md text-slate-400" title="Export chat as PDF">
+            <i data-lucide="download" class="w-4 h-4"></i>
+          </button>
+          <button id="new-chat-btn" class="p-2 hover:bg-slate-800 rounded-md text-slate-400" title="New chat">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Messages -->
+      <div id="chat-messages" class="flex-1 overflow-y-auto scrollbar-thin px-5 py-6 space-y-6">
+        <!-- Welcome -->
+        <div class="max-w-3xl mx-auto text-center py-8 animate-fade-in" id="welcome-block">
+          <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center mb-4 glow">
+            <i data-lucide="sparkles" class="w-7 h-7 text-white"></i>
+          </div>
+          <h2 class="text-2xl font-bold mb-2">What can I help you with?</h2>
+          <p class="text-slate-400 text-sm mb-8">Ask anything about your indexed websites. Answers are grounded in real content with citations.</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl mx-auto">
+            <button class="suggestion-btn text-left p-4 glass-light rounded-xl hover:bg-slate-800/40 transition group">
+              <div class="flex items-start gap-3">
+                <i data-lucide="book-open" class="w-4 h-4 text-brand-400 mt-0.5"></i>
+                <div>
+                  <div class="text-sm font-medium mb-1">Summarize the docs</div>
+                  <div class="text-xs text-slate-500">Give me a high-level overview of all indexed content</div>
+                </div>
+              </div>
+            </button>
+            <button class="suggestion-btn text-left p-4 glass-light rounded-xl hover:bg-slate-800/40 transition group">
+              <div class="flex items-start gap-3">
+                <i data-lucide="code-2" class="w-4 h-4 text-purple-400 mt-0.5"></i>
+                <div>
+                  <div class="text-sm font-medium mb-1">How do I create an API key?</div>
+                  <div class="text-xs text-slate-500">Step-by-step instructions with code examples</div>
+                </div>
+              </div>
+            </button>
+            <button class="suggestion-btn text-left p-4 glass-light rounded-xl hover:bg-slate-800/40 transition group">
+              <div class="flex items-start gap-3">
+                <i data-lucide="git-compare" class="w-4 h-4 text-pink-400 mt-0.5"></i>
+                <div>
+                  <div class="text-sm font-medium mb-1">Compare pricing tiers</div>
+                  <div class="text-xs text-slate-500">What's the difference between plans?</div>
+                </div>
+              </div>
+            </button>
+            <button class="suggestion-btn text-left p-4 glass-light rounded-xl hover:bg-slate-800/40 transition group">
+              <div class="flex items-start gap-3">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400 mt-0.5"></i>
+                <div>
+                  <div class="text-sm font-medium mb-1">Security best practices</div>
+                  <div class="text-xs text-slate-500">What are the recommended security measures?</div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div class="border-t border-slate-800/60 p-4 glass">
+        <div class="max-w-3xl mx-auto">
+          <div class="glass-light rounded-2xl p-3 focus-within:border-brand-500/50 transition">
+            <textarea id="chat-input" rows="1" placeholder="Ask a question about your indexed content..." class="w-full bg-transparent resize-none focus:outline-none text-sm placeholder-slate-500 max-h-40"></textarea>
+            <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/60">
+              <div class="flex items-center gap-1">
+                <button class="p-1.5 hover:bg-slate-800 rounded-md text-slate-400" title="Attach PDF">
+                  <i data-lucide="paperclip" class="w-4 h-4"></i>
+                </button>
+                <button class="p-1.5 hover:bg-slate-800 rounded-md text-slate-400" title="Voice input">
+                  <i data-lucide="mic" class="w-4 h-4"></i>
+                </button>
+                <div class="h-4 w-px bg-slate-800 mx-1"></div>
+                <select class="text-[11px] bg-transparent text-slate-400 focus:outline-none cursor-pointer">
+                  <option>GPT-4o-mini</option>
+                  <option>Gemini 2.5 Flash</option>
+                  <option>Claude 3.5 Sonnet</option>
+                </select>
+                <span class="text-[11px] text-slate-500 font-mono ml-1">Hybrid · BM25+Vector</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] text-slate-500 hidden sm:inline"><span class="kbd">⏎</span> send · <span class="kbd">⇧⏎</span> new line</span>
+                <button id="send-btn" class="px-3 py-1.5 bg-gradient-to-r from-brand-500 to-purple-600 text-white text-xs font-medium rounded-lg hover:opacity-90 transition flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                  <i data-lucide="send" class="w-3 h-3"></i> Send
+                </button>
+              </div>
+            </div>
+          </div>
+          <p class="text-center text-[10px] text-slate-600 mt-2">NexusRAG may produce inaccurate information. Verify important facts against sources.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== INGEST VIEW ===== -->
+    <div id="view-ingest" class="view hidden flex-1 overflow-y-auto scrollbar-thin p-6">
+      <div class="max-w-4xl mx-auto">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold mb-1">Ingest Website</h1>
+          <p class="text-sm text-slate-400">Crawl, chunk, embed, and index any public website into your knowledge base.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 space-y-6">
+            <!-- URL Input -->
+            <div class="glass rounded-2xl p-6">
+              <label class="text-xs font-medium text-slate-400 mb-2 block">Website URL</label>
+              <div class="flex gap-2">
+                <div class="flex-1 relative">
+                  <i data-lucide="globe" class="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+                  <input id="url-input" type="url" placeholder="https://docs.stripe.com" value="https://docs.stripe.com" class="w-full pl-10 pr-4 py-3 bg-slate-900/60 border border-slate-800 rounded-lg text-sm focus:outline-none focus:border-brand-500 transition font-mono"/>
+                </div>
+                <button id="crawl-btn" class="px-5 py-3 bg-gradient-to-r from-brand-500 to-purple-600 text-white text-sm font-medium rounded-lg hover:opacity-90 transition flex items-center gap-2">
+                  <i data-lucide="download-cloud" class="w-4 h-4"></i> Index
+                </button>
+              </div>
+
+              <div class="mt-4 grid grid-cols-2 gap-3">
+                <div>
+                  <label class="text-xs text-slate-400 mb-1.5 block">Crawl depth</label>
+                  <input id="depth-input" type="number" value="3" min="1" max="10" class="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-lg text-sm focus:outline-none focus:border-brand-500"/>
+                </div>
+                <div>
+                  <label class="text-xs text-slate-400 mb-1.5 block">Chunk size</label>
+                  <select class="w-full px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-lg text-sm focus:outline-none focus:border-brand-500">
+                    <option>512 tokens</option>
+                    <option selected>1024 tokens</option>
+                    <option>2048 tokens</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="mt-4 flex items-center gap-4 text-xs text-slate-400">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked class="accent-brand-500"/> Respect robots.txt
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked class="accent-brand-500"/> Follow same-domain only
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" class="accent-brand-500"/> Include PDFs
+                </label>
+              </div>
+            </div>
+
+            <!-- Pipeline Status -->
+            <div id="pipeline-card" class="glass rounded-2xl p-6 hidden">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h3 class="font-semibold text-sm">Indexing Pipeline</h3>
+                  <p class="text-xs text-slate-500 font-mono mt-0.5" id="pipeline-url">docs.stripe.com</p>
+                </div>
+                <div id="pipeline-status-badge" class="px-2.5 py-1 rounded-full text-[10px] font-medium bg-brand-500/20 text-brand-300 flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse"></span> Processing
+                </div>
+              </div>
+
+              <div class="space-y-3" id="pipeline-steps">
+                <!-- Steps injected by JS -->
+              </div>
+
+              <div class="mt-5 pt-4 border-t border-slate-800/60">
+                <div class="flex items-center justify-between text-xs mb-2">
+                  <span class="text-slate-400">Overall progress</span>
+                  <span class="font-mono text-slate-300" id="pipeline-progress-text">0%</span>
+                </div>
+                <div class="h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div id="pipeline-progress-bar" class="h-full bg-gradient-to-r from-brand-500 to-purple-500 rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+                <div class="grid grid-cols-4 gap-2 mt-4 text-center">
+                  <div class="p-2 bg-slate-900/40 rounded-lg">
+                    <div class="text-lg font-bold text-slate-200 font-mono" id="stat-pages">0</div>
+                    <div class="text-[10px] text-slate-500">Pages</div>
+                  </div>
+                  <div class="p-2 bg-slate-900/40 rounded-lg">
+                    <div class="text-lg font-bold text-slate-200 font-mono" id="stat-chunks">0</div>
+                    <div class="text-[10px] text-slate-500">Chunks</div>
+                  </div>
+                  <div class="p-2 bg-slate-900/40 rounded-lg">
+                    <div class="text-lg font-bold text-slate-200 font-mono" id="stat-tokens">0</div>
+                    <div class="text-[10px] text-slate-500">Tokens</div>
+                  </div>
+                  <div class="p-2 bg-slate-900/40 rounded-lg">
+                    <div class="text-lg font-bold text-slate-200 font-mono" id="stat-time">0s</div>
+                    <div class="text-[10px] text-slate-500">Elapsed</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sidebar -->
+          <div class="space-y-6">
+            <div class="glass rounded-2xl p-5">
+              <h3 class="font-semibold text-sm mb-3 flex items-center gap-2"><i data-lucide="workflow" class="w-4 h-4 text-brand-400"></i> Pipeline</h3>
+              <ol class="space-y-2.5 text-xs">
+                <li class="flex gap-2"><span class="text-brand-400 font-mono">01</span><span class="text-slate-300">Fetch URL & discover links</span></li>
+                <li class="flex gap-2"><span class="text-brand-400 font-mono">02</span><span class="text-slate-300">Extract with BeautifulSoup</span></li>
+                <li class="flex gap-2"><span class="text-brand-400 font-mono">03</span><span class="text-slate-300">Clean & deduplicate</span></li>
+                <li class="flex gap-2"><span class="text-brand-400 font-mono">04</span><span class="text-slate-300">Semantic chunking</span></li>
+                <li class="flex gap-2"><span class="text-brand-400 font-mono">05</span><span class="text-slate-300">Generate embeddings</span></li>
+                <li class="flex gap-2"><span class="text-brand-400 font-mono">06</span><span class="text-slate-300">Store in ChromaDB</span></li>
+                <li class="flex gap-2"><span class="text-brand-400 font-mono">07</span><span class="text-slate-300">Build BM25 index</span></li>
+              </ol>
+            </div>
+
+            <div class="glass rounded-2xl p-5">
+              <h3 class="font-semibold text-sm mb-3 flex items-center gap-2"><i data-lucide="cpu" class="w-4 h-4 text-purple-400"></i> Stack</h3>
+              <div class="space-y-2 text-xs">
+                <div class="flex justify-between"><span class="text-slate-400">Embeddings</span><span class="font-mono text-slate-300">MiniLM-L6-v2</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Vector DB</span><span class="font-mono text-slate-300">ChromaDB</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Retriever</span><span class="font-mono text-slate-300">Hybrid RRF</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">LLM</span><span class="font-mono text-slate-300">GPT-4o-mini</span></div>
+                <div class="flex justify-between"><span class="text-slate-400">Framework</span><span class="font-mono text-slate-300">LangChain</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== DOCUMENTS VIEW ===== -->
+    <div id="view-documents" class="view hidden flex-1 overflow-y-auto scrollbar-thin p-6">
+      <div class="max-w-5xl mx-auto">
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h1 class="text-2xl font-bold mb-1">Documents</h1>
+            <p class="text-sm text-slate-400">Manage your indexed websites and uploaded PDFs.</p>
+          </div>
+          <label class="px-4 py-2 bg-gradient-to-r from-brand-500 to-purple-600 text-white text-sm font-medium rounded-lg hover:opacity-90 transition flex items-center gap-2 cursor-pointer">
+            <i data-lucide="upload" class="w-4 h-4"></i> Upload PDF
+            <input type="file" accept=".pdf" class="hidden" id="pdf-upload"/>
+          </label>
+        </div>
+
+        <div class="glass rounded-2xl overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-900/40 text-xs text-slate-400 uppercase">
+              <tr>
+                <th class="text-left px-5 py-3 font-medium">Source</th>
+                <th class="text-left px-5 py-3 font-medium">Type</th>
+                <th class="text-left px-5 py-3 font-medium">Chunks</th>
+                <th class="text-left px-5 py-3 font-medium">Size</th>
+                <th class="text-left px-5 py-3 font-medium">Indexed</th>
+                <th class="text-right px-5 py-3 font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="doc-table" class="divide-y divide-slate-800/60">
+              <!-- Rows injected by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ANALYTICS VIEW ===== -->
+    <div id="view-analytics" class="view hidden flex-1 overflow-y-auto scrollbar-thin p-6">
+      <div class="max-w-6xl mx-auto">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold mb-1">Analytics</h1>
+          <p class="text-sm text-slate-400">Monitor usage, retrieval quality, and system health.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div class="glass rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs text-slate-400">Total Queries</span>
+              <i data-lucide="message-circle" class="w-4 h-4 text-brand-400"></i>
+            </div>
+            <div class="text-2xl font-bold">1,284</div>
+            <div class="text-[10px] text-emerald-400 mt-1">↑ 12.4% vs last week</div>
+          </div>
+          <div class="glass rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs text-slate-400">Avg. Latency</span>
+              <i data-lucide="zap" class="w-4 h-4 text-yellow-400"></i>
+            </div>
+            <div class="text-2xl font-bold">842<span class="text-sm text-slate-500">ms</span></div>
+            <div class="text-[10px] text-emerald-400 mt-1">↓ 8.2% vs last week</div>
+          </div>
+          <div class="glass rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs text-slate-400">Retrieval Recall</span>
+              <i data-lucide="target" class="w-4 h-4 text-emerald-400"></i>
+            </div>
+            <div class="text-2xl font-bold">94.2<span class="text-sm text-slate-500">%</span></div>
+            <div class="text-[10px] text-emerald-400 mt-1">↑ 2.1% vs last week</div>
+          </div>
+          <div class="glass rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs text-slate-400">Token Usage</span>
+              <i data-lucide="coins" class="w-4 h-4 text-purple-400"></i>
+            </div>
+            <div class="text-2xl font-bold">2.4<span class="text-sm text-slate-500">M</span></div>
+            <div class="text-[10px] text-slate-500 mt-1">of 10M monthly quota</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 glass rounded-2xl p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-semibold text-sm">Query Volume (7 days)</h3>
+              <div class="flex gap-1 text-[10px]">
+                <button class="px-2 py-1 bg-brand-500/20 text-brand-300 rounded">7D</button>
+                <button class="px-2 py-1 text-slate-400 hover:bg-slate-800 rounded">30D</button>
+                <button class="px-2 py-1 text-slate-400 hover:bg-slate-800 rounded">90D</button>
+              </div>
+            </div>
+            <div id="chart-area" class="h-64 relative"></div>
+          </div>
+
+          <div class="glass rounded-2xl p-5">
+            <h3 class="font-semibold text-sm mb-4">Top Queries</h3>
+            <div class="space-y-3 text-xs" id="top-queries">
+              <!-- injected -->
+            </div>
+          </div>
+
+          <div class="lg:col-span-3 glass rounded-2xl p-5">
+            <h3 class="font-semibold text-sm mb-4">Retrieval Quality Distribution</h3>
+            <div class="grid grid-cols-5 gap-3">
+              <div class="text-center">
+                <div class="h-32 flex items-end justify-center mb-2">
+                  <div class="w-12 bg-gradient-to-t from-emerald-500 to-emerald-400 rounded-t" style="height: 85%"></div>
+                </div>
+                <div class="text-xs font-medium">Excellent</div>
+                <div class="text-[10px] text-slate-500 font-mono">68%</div>
+              </div>
+              <div class="text-center">
+                <div class="h-32 flex items-end justify-center mb-2">
+                  <div class="w-12 bg-gradient-to-t from-brand-500 to-brand-400 rounded-t" style="height: 65%"></div>
+                </div>
+                <div class="text-xs font-medium">Good</div>
+                <div class="text-[10px] text-slate-500 font-mono">21%</div>
+              </div>
+              <div class="text-center">
+                <div class="h-32 flex items-end justify-center mb-2">
+                  <div class="w-12 bg-gradient-to-t from-yellow-500 to-yellow-400 rounded-t" style="height: 40%"></div>
+                </div>
+                <div class="text-xs font-medium">Partial</div>
+                <div class="text-[10px] text-slate-500 font-mono">8%</div>
+              </div>
+              <div class="text-center">
+                <div class="h-32 flex items-end justify-center mb-2">
+                  <div class="w-12 bg-gradient-to-t from-orange-500 to-orange-400 rounded-t" style="height: 20%"></div>
+                </div>
+                <div class="text-xs font-medium">Weak</div>
+                <div class="text-[10px] text-slate-500 font-mono">2%</div>
+              </div>
+              <div class="text-center">
+                <div class="h-32 flex items-end justify-center mb-2">
+                  <div class="w-12 bg-gradient-to-t from-red-500 to-red-400 rounded-t" style="height: 8%"></div>
+                </div>
+                <div class="text-xs font-medium">No match</div>
+                <div class="text-[10px] text-slate-500 font-mono">1%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container" class="fixed bottom-6 right-6 z-50 space-y-2"></div>
+
+<script>
+/* =========================================================
+   NexusRAG — Frontend simulation of full RAG chatbot
+   ========================================================= */
+
+// ---------- Icons ----------
+lucide.createIcons();
+
+// ---------- State ----------
+const state = {
+  user: null,
+  currentView: 'chat',
+  chats: [
+    { id: 'c1', title: 'Stripe API onboarding', updated: '2m ago', messages: [] },
+    { id: 'c2', title: 'OpenAI pricing tiers', updated: '1h ago', messages: [] },
+    { id: 'c3', title: 'LangChain retrieval patterns', updated: 'Yesterday', messages: [] },
+  ],
+  documents: [
+    { id: 'd1', name: 'docs.stripe.com', type: 'website', chunks: 1842, size: '4.2 MB', indexed: '2h ago', status: 'ready' },
+    { id: 'd2', name: 'openai.com/docs', type: 'website', chunks: 967, size: '2.1 MB', indexed: '1d ago', status: 'ready' },
+    { id: 'd3', name: 'langchain-ai-handbook.pdf', type: 'pdf', chunks: 512, size: '8.7 MB', indexed: '3d ago', status: 'ready' },
+  ],
+  isStreaming: false,
+};
+
+// ---------- Auth ----------
+const authScreen = document.getElementById('auth-screen');
+const app = document.getElementById('app');
+const authForm = document.getElementById('auth-form');
+const tabLogin = document.getElementById('tab-login');
+const tabRegister = document.getElementById('tab-register');
+const nameField = document.getElementById('name-field');
+const authBtnText = document.getElementById('auth-btn-text');
+let authMode = 'login';
+
+tabLogin.addEventListener('click', () => {
+  authMode = 'login';
+  tabLogin.className = 'flex-1 py-2 text-sm font-medium rounded-md bg-slate-800 text-white';
+  tabRegister.className = 'flex-1 py-2 text-sm font-medium rounded-md text-slate-400';
+  nameField.classList.add('hidden');
+  authBtnText.textContent = 'Sign In';
+});
+tabRegister.addEventListener('click', () => {
+  authMode = 'register';
+  tabRegister.className = 'flex-1 py-2 text-sm font-medium rounded-md bg-slate-800 text-white';
+  tabLogin.className = 'flex-1 py-2 text-sm font-medium rounded-md text-slate-400';
+  nameField.classList.remove('hidden');
+  authBtnText.textContent = 'Create Account';
+});
+
+authForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  authScreen.style.opacity = '0';
+  authScreen.style.transition = 'opacity 0.4s';
+  setTimeout(() => {
+    authScreen.classList.add('hidden');
+    app.classList.remove('hidden');
+    app.style.opacity = '0';
+    app.style.transition = 'opacity 0.4s';
+    requestAnimationFrame(() => app.style.opacity = '1');
+    renderChatHistory();
+    renderDocuments();
+    renderAnalytics();
+    showToast('Welcome back, Demo User', 'success');
+  }, 400);
+});
+
+document.getElementById('logout-btn').addEventListener('click', () => {
+  app.classList.add('hidden');
+  authScreen.classList.remove('hidden');
+  authScreen.style.opacity = '1';
+  showToast('Signed out successfully', 'info');
+});
+
+// ---------- Navigation ----------
+document.querySelectorAll('.nav-item').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const view = btn.dataset.view;
+    switchView(view);
+  });
+});
+
+function switchView(view) {
+  state.currentView = view;
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+  document.getElementById('view-' + view).classList.remove('hidden');
+}
+
+// ---------- Chat History ----------
+function renderChatHistory() {
+  const container = document.getElementById('chat-history');
+  container.innerHTML = state.chats.map(c => `
+    <button class="nav-item w-full flex items-center gap-2 px-3 py-1.5 rounded-md text-xs text-slate-400 hover:text-slate-200">
+      <i data-lucide="message-square" class="w-3 h-3"></i>
+      <span class="truncate flex-1 text-left">${c.title}</span>
+    </button>
+  `).join('');
+  lucide.createIcons();
+}
+
+// ---------- Documents ----------
+function renderDocuments() {
+  const tbody = document.getElementById('doc-table');
+  tbody.innerHTML = state.documents.map(d => `
+    <tr class="hover:bg-slate-900/40 transition">
+      <td class="px-5 py-3">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+            ${d.type === 'website' ? '<i data-lucide="globe" class="w-4 h-4 text-brand-400"></i>' : '<i data-lucide="file-text" class="w-4 h-4 text-pink-400"></i>'}
+          </div>
+          <div>
+            <div class="font-medium text-slate-200">${d.name}</div>
+            <div class="text-[10px] text-slate-500 font-mono">${d.type === 'website' ? 'Recursive crawl · depth 3' : 'PDF · 42 pages'}</div>
+          </div>
+        </div>
+      </td>
+      <td class="px-5 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-medium ${d.type === 'website' ? 'bg-brand-500/15 text-brand-300' : 'bg-pink-500/15 text-pink-300'}">${d.type}</span></td>
+      <td class="px-5 py-3 font-mono text-slate-300">${d.chunks.toLocaleString()}</td>
+      <td class="px-5 py-3 text-slate-400">${d.size}</td>
+      <td class="px-5 py-3 text-slate-400">${d.indexed}</td>
+      <td class="px-5 py-3 text-right">
+        <button class="p-1.5 hover:bg-slate-800 rounded text-slate-400" title="Re-index"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i></button>
+        <button class="p-1.5 hover:bg-slate-800 rounded text-slate-400" title="Delete"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+      </td>
+    </tr>
+  `).join('');
+  document.getElementById('doc-count').textContent = state.documents.length;
+  lucide.createIcons();
+}
+
+// ---------- Analytics ----------
+function renderAnalytics() {
+  // Bar chart
+  const chart = document.getElementById('chart-area');
+  const data = [142, 198, 167, 234, 189, 276, 312];
+  const max = Math.max(...data);
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  chart.innerHTML = `
+    <div class="absolute inset-0 flex items-end justify-between gap-3 px-2 pb-6 pt-2">
+      ${data.map((v, i) => `
+        <div class="flex-1 flex flex-col items-center gap-2">
+          <div class="w-full flex flex-col items-center justify-end flex-1">
+            <div class="text-[10px] font-mono text-slate-500 mb-1">${v}</div>
+            <div class="w-full bg-gradient-to-t from-brand-600 to-purple-500 rounded-t transition-all duration-700" style="height: ${(v/max)*100}%; animation: slideUp 0.6s ease-out ${i*0.05}s both"></div>
+          </div>
+          <div class="text-[10px] text-slate-500">${days[i]}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  // Top queries
+  const topQueries = document.getElementById('top-queries');
+  const queries = [
+    { q: 'How do I create a payment intent?', c: 184 },
+    { q: 'What are the API rate limits?', c: 142 },
+    { q: 'Explain webhook signatures', c: 98 },
+    { q: 'Compare GPT-4o vs GPT-4o-mini', c: 76 },
+    { q: 'How does RAG retrieval work?', c: 54 },
+  ];
+  topQueries.innerHTML = queries.map((q, i) => `
+    <div class="flex items-center gap-3">
+      <span class="text-[10px] font-mono text-slate-500 w-4">${i+1}</span>
+      <div class="flex-1 min-w-0">
+        <div class="truncate text-slate-300">${q.q}</div>
+        <div class="h-1 bg-slate-800 rounded-full mt-1 overflow-hidden">
+          <div class="h-full bg-gradient-to-r from-brand-500 to-purple-500 rounded-full" style="width: ${(q.c/200)*100}%"></div>
+        </div>
+      </div>
+      <span class="text-[10px] font-mono text-slate-500">${q.c}</span>
+    </div>
+  `).join('');
+}
+
+// ---------- Toast ----------
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  const colors = {
+    success: 'from-emerald-500/20 to-emerald-500/5 border-emerald-500/30 text-emerald-300',
+    error: 'from-red-500/20 to-red-500/5 border-red-500/30 text-red-300',
+    info: 'from-brand-500/20 to-brand-500/5 border-brand-500/30 text-brand-300',
+  };
+  const icons = { success: 'check-circle', error: 'alert-circle', info: 'info' };
+  toast.className = `glass rounded-lg px-4 py-3 flex items-center gap-3 min-w-[260px] animate-slide-up bg-gradient-to-r ${colors[type]} border`;
+  toast.innerHTML = `<i data-lucide="${icons[type]}" class="w-4 h-4"></i><span class="text-xs flex-1">${message}</span>`;
+  container.appendChild(toast);
+  lucide.createIcons();
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
+// ---------- Ingest Pipeline ----------
+const pipelineSteps = [
+  { id: 'fetch', label: 'Fetching URLs & discovering links', icon: 'globe', detail: 'Respecting robots.txt, following same-domain links' },
+  { id: 'extract', label: 'Extracting content with BeautifulSoup', icon: 'code-2', detail: 'Stripping nav, ads, scripts; keeping semantic HTML' },
+  { id: 'clean', label: 'Cleaning & deduplicating', icon: 'sparkles', detail: 'Removing boilerplate, normalizing whitespace' },
+  { id: 'chunk', label: 'Semantic chunking', icon: 'layers', detail: 'Splitting into 1024-token chunks with 128-token overlap' },
+  { id: 'embed', label: 'Generating embeddings', icon: 'cpu', detail: 'sentence-transformers/all-MiniLM-L6-v2 · 384 dims' },
+  { id: 'store', label: 'Storing in ChromaDB', icon: 'database', detail: 'Persistent vector store with metadata' },
+  { id: 'bm25', label: 'Building BM25 index', icon: 'search', detail: 'For hybrid retrieval (RRF fusion)' },
+];
+
+document.getElementById('crawl-btn').addEventListener('click', startCrawl);
+
+function startCrawl() {
+  const url = document.getElementById('url-input').value.trim();
+  if (!url) { showToast('Please enter a URL', 'error'); return; }
+
+  const card = document.getElementById('pipeline-card');
+  card.classList.remove('hidden');
+  document.getElementById('pipeline-url').textContent = new URL(url).hostname;
+
+  const stepsContainer = document.getElementById('pipeline-steps');
+  stepsContainer.innerHTML = pipelineSteps.map(s => `
+    <div id="step-${s.id}" class="flex items-center gap-3 p-3 rounded-lg bg-slate-900/40 border border-slate-800/60 transition-all">
+      <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 step-icon">
+        <i data-lucide="${s.icon}" class="w-4 h-4 text-slate-500"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-medium text-slate-300 step-label">${s.label}</div>
+        <div class="text-[11px] text-slate-500 step-detail">${s.detail}</div>
+      </div>
+      <div class="step-status">
+        <i data-lucide="circle" class="w-4 h-4 text-slate-600"></i>
+      </div>
+    </div>
+  `).join('');
+  lucide.createIcons();
+
+  // Animate steps
+  let currentStep = 0;
+  const startTime = Date.now();
+  const totalSteps = pipelineSteps.length;
+
+  const tick = () => {
+    if (currentStep >= totalSteps) {
+      finishCrawl();
+      return;
+    }
+    const step = pipelineSteps[currentStep];
+    const el = document.getElementById('step-' + step.id);
+    el.classList.remove('bg-slate-900/40');
+    el.classList.add('bg-brand-500/10', 'border-brand-500/30');
+    el.querySelector('.step-icon').innerHTML = `<div class="w-4 h-4 rounded-full border-2 border-brand-400 border-t-transparent animate-spin"></div>`;
+    el.querySelector('.step-status').innerHTML = `<span class="text-[10px] font-mono text-brand-300">running</span>`;
+
+    const duration = 600 + Math.random() * 800;
+    setTimeout(() => {
+      el.classList.remove('bg-brand-500/10', 'border-brand-500/30');
+      el.classList.add('bg-emerald-500/5', 'border-emerald-500/20');
+      el.querySelector('.step-icon').innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>`;
+      el.querySelector('.step-status').innerHTML = `<i data-lucide="check" class="w-4 h-4 text-emerald-400"></i>`;
+      lucide.createIcons();
+
+      const progress = Math.round(((currentStep + 1) / totalSteps) * 100);
+      document.getElementById('pipeline-progress-bar').style.width = progress + '%';
+      document.getElementById('pipeline-progress-text').textContent = progress + '%';
+
+      // Update stats
+      const stats = [
+        [12, 47, 189, 342, 891, 1247, 1842],
+        [24, 89, 201, 412, 987, 1421, 2156],
+        [1200, 4500, 9800, 21000, 48000, 67000, 94200],
+      ];
+      document.getElementById('stat-pages').textContent = stats[0][currentStep];
+      document.getElementById('stat-chunks').textContent = stats[1][currentStep];
+      document.getElementById('stat-tokens').textContent = (stats[2][currentStep]/1000).toFixed(1) + 'k';
+      document.getElementById('stat-time').textContent = Math.round((Date.now() - startTime)/1000) + 's';
+
+      currentStep++;
+      lucide.createIcons();
+      setTimeout(tick, 200);
+    }, duration);
+  };
+  tick();
+}
+
+function finishCrawl() {
+  const badge = document.getElementById('pipeline-status-badge');
+  badge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Complete`;
+  badge.className = 'px-2.5 py-1 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-300 flex items-center gap-1.5';
+  showToast('Website indexed successfully · 1,842 chunks stored', 'success');
+
+  // Add to documents
+  const url = document.getElementById('url-input').value.trim();
+  const hostname = new URL(url).hostname;
+  if (!state.documents.find(d => d.name === hostname)) {
+    state.documents.unshift({
+      id: 'd' + Date.now(), name: hostname, type: 'website',
+      chunks: 1842, size: '4.2 MB', indexed: 'just now', status: 'ready'
+    });
+    renderDocuments();
+  }
+}
+
+// ---------- Chat ----------
+const chatInput = document.getElementById('chat-input');
+const sendBtn = document.getElementById('send-btn');
+const chatMessages = document.getElementById('chat-messages');
+const welcomeBlock = document.getElementById('welcome-block');
+
+chatInput.addEventListener('input', () => {
+  chatInput.style.height = 'auto';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + 'px';
+});
+
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+sendBtn.addEventListener('click', sendMessage);
+
+document.querySelectorAll('.suggestion-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const text = btn.querySelector('.font-medium').textContent;
+    chatInput.value = text;
+    sendMessage();
+  });
+});
+
+document.getElementById('new-chat-btn').addEventListener('click', () => {
+  chatMessages.innerHTML = '';
+  chatMessages.appendChild(welcomeBlock);
+  welcomeBlock.style.display = 'block';
+  showToast('New conversation started', 'info');
+});
+
+document.getElementById('export-btn').addEventListener('click', () => {
+  showToast('Chat exported as PDF', 'success');
+});
+
+document.getElementById('pdf-upload').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  state.documents.unshift({
+    id: 'd' + Date.now(), name: file.name, type: 'pdf',
+    chunks: Math.floor(Math.random() * 500) + 200,
+    size: (file.size / 1024 / 1024).toFixed(1) + ' MB',
+    indexed: 'just now', status: 'ready'
+  });
+  renderDocuments();
+  showToast(`PDF "${file.name}" indexed successfully`, 'success');
+  switchView('documents');
+});
+
+// Mock RAG responses with sources
+const mockResponses = {
+  default: {
+    answer: `Based on the indexed documentation, here's what I found:\n\n**Key Points:**\n\n1. The system uses a hybrid retrieval approach combining BM25 keyword search with dense vector similarity search, fused using Reciprocal Rank Fusion (RRF).\n\n2. Content is chunked semantically using a 1024-token window with 128-token overlap to preserve context across boundaries.\n\n3. Embeddings are generated using \`sentence-transformers/all-MiniLM-L6-v2\`, producing 384-dimensional vectors stored in ChromaDB.\n\n**Implementation Details:**\n\nThe retrieval pipeline follows these stages:\n- Query rewriting for improved recall\n- Hybrid search (BM25 + vector)\n- Context compression via LLM chain\n- Re-ranking with cross-encoder\n- Final generation with grounded citations\n\nThis architecture achieves 94.2% retrieval recall on the benchmark dataset.`,
+    sources: [
+      { title: 'Architecture Overview', url: 'docs.stripe.com/architecture', score: 0.94, snippet: 'The hybrid retrieval pipeline combines sparse BM25 with dense embeddings...' },
+      { title: 'Chunking Strategy', url: 'docs.stripe.com/rag/chunking', score: 0.89, snippet: 'Semantic chunking uses a sliding window of 1024 tokens with 128-token overlap...' },
+      { title: 'Embedding Model', url: 'openai.com/docs/embeddings', score: 0.82, snippet: 'all-MiniLM-L6-v2 produces 384-dimensional vectors optimized for semantic search...' },
+    ]
+  },
+  api: {
+    answer: `To create an API key, follow these steps:\n\n**Step 1: Navigate to the Dashboard**\n\nLog in to your account and go to **Settings → API Keys** in the left sidebar.\n\n**Step 2: Generate New Key**\n\nClick the **"Create new secret key"** button. You'll be prompted to:\n- Name your key (e.g., "Production Backend")\n- Select permissions (read, write, or full access)\n- Set an expiration date (optional)\n\n**Step 3: Copy & Secure**\n\n\`\`\`bash\n# Store in environment variable\nexport API_KEY="sk_live_..." \n\n# Never commit to version control\necho ".env" >> .gitignore\n\`\`\`\n\n⚠️ **Important:** The key is only shown once. Store it securely using a secrets manager like AWS Secrets Manager or HashiCorp Vault.\n\n**Step 4: Test the Key**\n\n\`\`\`python\nimport requests\nresponse = requests.get(\n    "https://api.example.com/v1/me",\n    headers={"Authorization": f"Bearer {API_KEY}"}\n)\nprint(response.json())\n\`\`\``,
+    sources: [
+      { title: 'Authentication Guide', url: 'docs.stripe.com/auth', score: 0.97, snippet: 'Create API keys from the dashboard under Settings → API Keys...' },
+      { title: 'Security Best Practices', url: 'docs.stripe.com/security', score: 0.91, snippet: 'Never expose secret keys in client-side code or version control...' },
+    ]
+  },
+  pricing: {
+    answer: `Here's a comparison of the pricing tiers based on the documentation:\n\n| Feature | **Free** | **Pro** | **Enterprise** |\n|---------|---------|---------|----------------|\n| Price | $0/mo | $29/mo | Custom |\n| Queries | 1,000 | 50,000 | Unlimited |\n| Documents | 5 | 100 | Unlimited |\n| Models | GPT-4o-mini | GPT-4o, Gemini | All + custom |\n| Support | Community | Email | Dedicated |\n| SLA | — | 99.5% | 99.99% |\n\n**Recommendation:**\n\n- Start with **Free** for prototyping\n- Upgrade to **Pro** for production workloads under 50k queries/month\n- Contact sales for **Enterprise** if you need custom models, SSO, or dedicated infrastructure\n\nAll paid plans include hybrid search, conversation memory, and analytics dashboard.`,
+    sources: [
+      { title: 'Pricing Page', url: 'openai.com/pricing', score: 0.96, snippet: 'Three tiers available: Free, Pro at $29/mo, and Enterprise with custom pricing...' },
+      { title: 'Plan Comparison', url: 'openai.com/docs/plans', score: 0.88, snippet: 'Pro plan includes 50,000 queries/month and access to GPT-4o...' },
+      { title: 'Enterprise Features', url: 'openai.com/enterprise', score: 0.84, snippet: 'Enterprise customers get dedicated infrastructure, SSO, and 99.99% SLA...' },
+    ]
+  }
+};
+
+function getMockResponse(query) {
+  const q = query.toLowerCase();
+  if (q.includes('api key') || q.includes('create') || q.includes('authentication')) return mockResponses.api;
+  if (q.includes('pricing') || q.includes('plan') || q.includes('cost') || q.includes('tier')) return mockResponses.pricing;
+  return mockResponses.default;
+}
+
+function sendMessage() {
+  const text = chatInput.value.trim();
+  if (!text || state.isStreaming) return;
+
+  welcomeBlock.style.display = 'none';
+  state.isStreaming = true;
+  sendBtn.disabled = true;
+
+  // User message
+  appendMessage('user', text);
+  chatInput.value = '';
+  chatInput.style.height = 'auto';
+
+  // Typing indicator
+  const typingId = 'typing-' + Date.now();
+  appendTypingIndicator(typingId);
+
+  // Simulate retrieval delay
+  setTimeout(() => {
+    removeTypingIndicator(typingId);
+    const response = getMockResponse(text);
+    streamResponse(response);
+  }, 900);
+}
+
+function appendMessage(role, content, sources = null) {
+  const msg = document.createElement('div');
+  msg.className = 'max-w-3xl mx-auto animate-slide-up';
+
+  if (role === 'user') {
+    msg.innerHTML = `
+      <div class="flex items-start gap-3 justify-end">
+        <div class="chat-bubble-user rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[80%]">
+          <p class="text-sm text-white whitespace-pre-wrap">${escapeHtml(content)}</p>
+        </div>
+        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500 to-orange-500 flex items-center justify-center flex-shrink-0 text-xs font-bold text-white">DL</div>
+      </div>
+    `;
+  } else {
+    msg.innerHTML = `
+      <div class="flex items-start gap-3">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+          <i data-lucide="sparkles" class="w-4 h-4 text-white"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="chat-bubble-ai rounded-2xl rounded-tl-sm px-4 py-3">
+            <div class="ai-content text-sm text-slate-200 whitespace-pre-wrap leading-relaxed prose-invert"></div>
+          </div>
+          ${sources ? renderSources(sources) : ''}
+          <div class="flex items-center gap-1 mt-2 ml-1">
+            <button class="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-slate-300" title="Copy"><i data-lucide="copy" class="w-3 h-3"></i></button>
+            <button class="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-slate-300" title="Good response"><i data-lucide="thumbs-up" class="w-3 h-3"></i></button>
+            <button class="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-slate-300" title="Bad response"><i data-lucide="thumbs-down" class="w-3 h-3"></i></button>
+            <button class="p-1 hover:bg-slate-800 rounded text-slate-500 hover:text-slate-300" title="Regenerate"><i data-lucide="refresh-cw" class="w-3 h-3"></i></button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  chatMessages.appendChild(msg);
+  lucide.createIcons();
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return msg;
+}
+
+function renderSources(sources) {
+  return `
+    <div class="mt-3">
+      <div class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <i data-lucide="link-2" class="w-3 h-3"></i> ${sources.length} Sources
+      </div>
+      <div class="flex flex-wrap gap-2">
+        ${sources.map(s => `
+          <div class="source-chip glass-light rounded-lg px-3 py-2 cursor-pointer max-w-xs" title="${escapeHtml(s.snippet)}">
+            <div class="flex items-center gap-2 mb-1">
+              <div class="w-4 h-4 rounded bg-slate-800 flex items-center justify-center flex-shrink-0">
+                <i data-lucide="globe" class="w-2.5 h-2.5 text-brand-400"></i>
+              </div>
+              <span class="text-[11px] font-medium text-slate-200 truncate">${escapeHtml(s.title)}</span>
+              <span class="text-[9px] font-mono text-emerald-400 ml-auto flex-shrink-0">${(s.score*100).toFixed(0)}%</span>
+            </div>
+            <div class="text-[10px] text-slate-500 font-mono truncate">${escapeHtml(s.url)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function appendTypingIndicator(id) {
+  const msg = document.createElement('div');
+  msg.id = id;
+  msg.className = 'max-w-3xl mx-auto animate-fade-in';
+  msg.innerHTML = `
+    <div class="flex items-start gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+        <i data-lucide="sparkles" class="w-4 h-4 text-white"></i>
+      </div>
+      <div class="chat-bubble-ai rounded-2xl rounded-tl-sm px-4 py-3">
+        <div class="flex items-center gap-2">
+          <div class="flex gap-1">
+            <div class="typing-dot w-1.5 h-1.5 rounded-full bg-brand-400"></div>
+            <div class="typing-dot w-1.5 h-1.5 rounded-full bg-brand-400"></kerdiv>
+            <div class="typing-dot w-1.5 h-1.5 rounded-full bg-brand-400"></div>
+          </div>
+          <span class="text-[11px] text-slate-500 ml-2">Retrieving relevant chunks...</span>
+        </div>
+      </div>
+    </div>
+  `;
+  chatMessages.appendChild(msg);
+  lucide.createIcons();
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function removeTypingIndicator(id) {
+  document.getElementById(id)?.remove();
+}
+
+async function streamResponse(response) {
+  const msgEl = appendMessage('assistant', '', response.sources);
+  const contentEl = msgEl.querySelector('.ai-content');
+
+  // Simulate streaming
+  const fullText = response.answer;
+  const tokens = fullText.split(/(\s+)/);
+  let current = '';
+
+  for (let i = 0; i < tokens.length; i++) {
+    current += tokens[i];
+    contentEl.innerHTML = renderMarkdown(current);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    await sleep(15 + Math.random() * 25);
+  }
+
+  state.isStreaming = false;
+  sendBtn.disabled = false;
+}
+
+function renderMarkdown(text) {
+  // Simple markdown renderer
+  let html = escapeHtml(text);
+  // Code blocks
+  html = html.replace(/
