@@ -1,364 +1,220 @@
 # 🚀 Free Deployment Guide for RAG Chatbot
 
-This guide covers **100% free deployment** options with no credit card required.
+This guide covers **100% free deployment** with no credit card required for hosting your RAG chatbot.
 
-## ⚠️ Important Limitations of Free Tiers
+## ⚡ Quick Start: Deploy in 5 Minutes
 
-| Platform | Limitations |
-|----------|-------------|
-| **Render** | Web services sleep after 15min inactivity, 750 hours/month limit |
-| **Vercel** | 100GB bandwidth/month, serverless function timeout 10s |
-| **Railway** | $5 free credit/month (≈500 hours), then pauses |
-| **Hugging Face Spaces** | CPU only, 16GB RAM limit, sleeps after inactivity |
-| **Fly.io** | 3 shared-cpu-1x 256mb VMs free (always-on) |
-
-## 🎯 Recommended Free Stack
-
-```
-Frontend: Vercel (Free Forever)
-Backend: Render Free Tier or Hugging Face Spaces
-Database: SQLite (built-in) + ChromaDB (file-based)
-LLM: Google Gemini Free Tier (60 requests/minute)
-Embeddings: sentence-transformers (local, free)
-```
-
----
-
-## Option 1: Vercel + Render (Recommended)
-
-### Step 1: Prepare Backend for Render
-
-#### 1.1 Create `render.yaml`
-
-```yaml
-services:
-  - type: web
-    name: rag-chatbot-backend
-    env: python
-    buildCommand: |
-      pip install -r requirements.txt
-      python -m spacy download en_core_web_sm
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
-      - key: DATABASE_URL
-        value: sqlite:///./data/chatbot.db
-      - key: CHROMA_PERSIST_DIR
-        value: ./data/chroma_db
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: JWT_SECRET
-        generateValue: true
-      - key: CORS_ORIGINS
-        value: https://your-frontend.vercel.app
-    disk:
-      name: chatbot-data
-      mountPath: /data
-      sizeGB: 1
-```
-
-#### 1.2 Update `requirements.txt` for Render
-
-Add these lines to your existing `requirements.txt`:
-
-```txt
-gunicorn==21.2.0
-uvicorn[standard]==0.27.0
-```
-
-#### 1.3 Create `start.sh` for Render
-
+### Step 1: Get Your Free Gemini API Key
 ```bash
-#!/bin/bash
-mkdir -p ./data/chroma_db
-python -m spacy download en_core_web_sm
-exec gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
+# Visit https://aistudio.google.com/app/apikey
+# Create a free API key (60 requests/minute, 1M tokens/day free)
 ```
 
-Make it executable:
-```bash
-chmod +x start.sh
-```
+### Step 2: Deploy Backend to Render (Free Tier)
 
-### Step 2: Deploy Backend on Render
+#### 2.1 Prepare Your Repository
+The backend is already configured with the following files:
+- `backend/render.yaml` - Render configuration
+- `backend/start.sh` - Startup script  
+- `backend/requirements.txt` - Updated with gunicorn and spacy
 
-1. **Sign up**: Go to [render.com](https://render.com) and create a free account
-2. **New Web Service**: Click "New +" → "Web Service"
-3. **Connect Repository**: Connect your GitHub repo
-4. **Configure**:
-   - Name: `rag-chatbot-backend`
-   - Environment: `Python 3`
-   - Build Command: `pip install -r requirements.txt && python -m spacy download en_core_web_sm`
-   - Start Command: `./start.sh`
-5. **Add Environment Variables**:
+#### 2.2 Deploy on Render
+1. Go to [render.com](https://render.com) and sign up (free)
+2. Click **"New +"** → **"Web Service"**
+3. Connect your GitHub repository
+4. Configure:
+   - **Name**: `rag-chatbot-backend`
+   - **Environment**: `Python 3`
+   - **Build Command**: 
+     ```bash
+     pip install -r requirements.txt && python -m spacy download en_core_web_sm
+     ```
+   - **Start Command**: `./start.sh`
+5. Add Environment Variables:
    ```
-   GEMINI_API_KEY=your_actual_key
-   JWT_SECRET=your_secret_key_here
+   GEMINI_API_KEY=your_actual_gemini_key
+   JWT_SECRET=$(openssl rand -hex 32)
    CORS_ORIGINS=https://your-frontend.vercel.app
    DATABASE_URL=sqlite:///./data/chatbot.db
    CHROMA_PERSIST_DIR=./data/chroma_db
    ```
-6. **Add Disk**: 
-   - Click "Add Disk"
+6. Add Persistent Disk:
+   - Click **"Add Disk"**
    - Name: `chatbot-data`
-   - Mount Path: `/data`
-   - Size: `1 GB` (free tier)
-7. **Deploy**: Click "Create Web Service"
+   - Mount Path: `/app/data`
+   - Size: `1 GB` (free tier limit)
+7. Click **"Create Web Service"**
 
-⏱️ **Wait 5-10 minutes** for first deployment
+⏱️ Wait 5-10 minutes for the first deployment
 
-### Step 3: Deploy Frontend on Vercel
+### Step 3: Deploy Frontend to Vercel (Free Forever)
 
 #### 3.1 Update Frontend Environment
-
-Create `.env.production` in frontend folder:
-
+Create `.env.production` in the frontend folder:
 ```env
 NEXT_PUBLIC_API_URL=https://rag-chatbot-backend.onrender.com/api/v1
 NEXT_PUBLIC_GEMINI_ENABLED=true
 ```
 
 #### 3.2 Deploy to Vercel
-
-1. **Install Vercel CLI** (optional):
-   ```bash
-   npm i -g vercel
+1. Go to [vercel.com](https://vercel.com) and sign up (free)
+2. Click **"Add New Project"**
+3. Import your GitHub repository
+4. Set **Root Directory** to `frontend`
+5. Add environment variable:
    ```
-
-2. **Deploy via CLI**:
-   ```bash
-   cd frontend
-   vercel login
-   vercel --prod
+   NEXT_PUBLIC_API_URL=https://rag-chatbot-backend.onrender.com/api/v1
    ```
+6. Click **"Deploy"**
 
-3. **Or Deploy via Web**:
-   - Go to [vercel.com](https://vercel.com)
-   - Click "Add New Project"
-   - Import your GitHub repository
-   - Set root directory to `frontend`
-   - Add environment variables:
-     ```
-     NEXT_PUBLIC_API_URL=https://rag-chatbot-backend.onrender.com/api/v1
-     ```
-   - Click "Deploy"
+⏱️ Wait 2-3 minutes for deployment
 
 ### Step 4: Update CORS Settings
-
-In your backend code, update CORS origins:
-
-```python
-# In app/main.py
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+Once both are deployed, update the backend CORS environment variable on Render:
 ```
+CORS_ORIGINS=https://your-frontend.vercel.app,http://localhost:3000
+```
+
+Redeploy the backend (Render auto-redeploys when env vars change).
+
+### Step 5: Test Your Deployment
+1. Visit your Vercel frontend URL
+2. Enter a website URL (e.g., `https://example.com`)
+3. Ask questions about the website!
 
 ---
 
-## Option 2: Hugging Face Spaces (Completely Free)
+## 🎯 Alternative Free Hosting Options
 
-### Step 1: Create Space
+### Option A: Hugging Face Spaces (Completely Free)
 
+**Best for**: Demos and prototypes
+
+#### Setup Steps:
 1. Go to [huggingface.co/spaces](https://huggingface.co/spaces)
-2. Click "Create new Space"
+2. Click **"Create new Space"**
 3. Configure:
    - Space name: `rag-chatbot`
-   - License: `MIT`
    - SDK: `Docker`
    - Visibility: `Public`
+4. Create a `Dockerfile` in backend root:
+   ```dockerfile
+   FROM python:3.11-slim
+   
+   WORKDIR /app
+   
+   RUN apt-get update && apt-get install -y git curl \
+       && rm -rf /var/lib/apt/lists/*
+   
+   COPY requirements.txt .
+   RUN pip install --no-cache-dir -r requirements.txt
+   RUN python -m spacy download en_core_web_sm
+   
+   COPY app/ ./app/
+   COPY data/ ./data/ 2>/dev/null || true
+   
+   RUN mkdir -p ./data/chroma_db
+   
+   EXPOSE 7860
+   
+   CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
+   ```
+5. Push to Hugging Face:
+   ```bash
+   pip install huggingface_hub
+   huggingface-cli login
+   
+   # Clone your space
+   git clone https://huggingface.co/spaces/YOUR_USERNAME/rag-chatbot
+   cd rag-chatbot
+   
+   # Copy backend files
+   cp -r ../backend/* ./
+   
+   git add .
+   git commit -m "Initial deployment"
+   git push
+   ```
 
-### Step 2: Create Dockerfile for HF Spaces
+**Limitations**: 
+- CPU only, 16GB RAM
+- Sleeps after 48 hours of inactivity
+- Public by default
 
-```dockerfile
-FROM python:3.11-slim
+### Option B: Fly.io (Always-Free VMs)
 
-WORKDIR /app
+**Best for**: Always-on backend with more control
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+#### Setup Steps:
+1. Install Fly CLI:
+   ```bash
+   curl -L https://fly.io/install.sh | sh
+   fly auth login
+   ```
 
-# Copy requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-RUN python -m spacy download en_core_web_sm
+2. Create and configure:
+   ```bash
+   cd backend
+   fly launch --name rag-chatbot-backend
+   ```
 
-# Copy application
-COPY app/ ./app/
-COPY data/ ./data/
+3. Update `fly.toml`:
+   ```toml
+   app = "rag-chatbot-backend"
+   primary_region = "sjc"
+   
+   [build]
+     dockerfile = "Dockerfile"
+   
+   [env]
+     PORT = "8080"
+     DATABASE_URL = "sqlite:///./data/chatbot.db"
+     CHROMA_PERSIST_DIR = "./data/chroma_db"
+   
+   [mounts]
+     source = "chatbot_data"
+     destination = "/app/data"
+   
+   [[vm]]
+     cpu_kind = "shared"
+     cpus = 1
+     memory_mb = 256
+   
+   [[services]]
+     protocol = "tcp"
+     internal_port = 8080
+     
+     [[services.ports]]
+       port = 80
+       handlers = ["http"]
+     
+     [[services.ports]]
+       port = 443
+       handlers = ["tls", "http"]
+     
+     [[services.http_checks]]
+       interval = 10000
+       grace_period = "5s"
+       method = "get"
+       path = "/health"
+   ```
 
-# Create data directories
-RUN mkdir -p ./data/chroma_db
+4. Deploy:
+   ```bash
+   fly secrets set GEMINI_API_KEY=your_key
+   fly secrets set JWT_SECRET=$(openssl rand -hex 32)
+   fly deploy
+   ```
 
-# Expose port
-EXPOSE 7860
+**Free Tier**: 3 shared-cpu-1x 256mb VMs (always-on)
 
-# Run with Gradio proxy compatibility
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
-```
+### Option C: Railway (Free Credit)
 
-### Step 3: Update Backend for HF Spaces
+**Best for**: Easy deployment with $5/month free credit
 
-Create `app/hf_config.py`:
-
-```python
-import os
-
-# Hugging Face Spaces specific config
-HF_SPACE = os.getenv("SYSTEM", "") == "spaces"
-PORT = int(os.getenv("PORT", 7860))
-HOST = "0.0.0.0" if HF_SPACE else "127.0.0.1"
-
-# Disable auth for demo mode (optional)
-DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() == "true"
-```
-
-Update `app/main.py`:
-
-```python
-from app.hf_config import HF_SPACE, PORT, HOST, DEMO_MODE
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "app.main:app",
-        host=HOST,
-        port=PORT,
-        reload=False if HF_SPACE else True
-    )
-```
-
-### Step 4: Push to Hugging Face
-
-```bash
-# Install huggingface-cli
-pip install huggingface_hub
-
-# Login
-huggingface-cli login
-
-# Clone your space
-git clone https://huggingface.co/spaces/YOUR_USERNAME/rag-chatbot
-cd rag-chatbot
-
-# Copy your files
-cp -r ../your-project/app ./
-cp -r ../your-project/data ./
-cp Dockerfile ./
-cp requirements.txt ./
-
-# Commit and push
-git add .
-git commit -m "Initial deployment"
-git push
-```
-
----
-
-## Option 3: Fly.io (Always-Free VMs)
-
-### Step 1: Install Fly CLI
-
-```bash
-curl -L https://fly.io/install.sh | sh
-fly auth login
-```
-
-### Step 2: Create Fly App
-
-```bash
-cd backend
-fly launch --name rag-chatbot-backend
-```
-
-### Step 3: Configure `fly.toml`
-
-```toml
-app = "rag-chatbot-backend"
-primary_region = "sjc"
-
-[build]
-  dockerfile = "Dockerfile"
-
-[env]
-  PORT = "8080"
-  DATABASE_URL = "sqlite:///./data/chatbot.db"
-  CHROMA_PERSIST_DIR = "./data/chroma_db"
-
-[mounts]
-  source = "chatbot_data"
-  destination = "/app/data"
-
-[[vm]]
-  cpu_kind = "shared"
-  cpus = 1
-  memory_mb = 256
-
-[[services]]
-  protocol = "tcp"
-  internal_port = 8080
-  
-  [[services.ports]]
-    port = 80
-    handlers = ["http"]
-  
-  [[services.ports]]
-    port = 443
-    handlers = ["tls", "http"]
-  
-  [[services.http_checks]]
-    interval = 10000
-    grace_period = "5s"
-    method = "get"
-    path = "/health"
-```
-
-### Step 4: Create Dockerfile for Fly
-
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-
-RUN apt-get update && apt-get install -y git curl
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-RUN python -m spacy download en_core_web_sm
-
-COPY . .
-RUN mkdir -p ./data/chroma_db
-
-EXPOSE 8080
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
-```
-
-### Step 5: Deploy
-
-```bash
-fly secrets set GEMINI_API_KEY=your_key
-fly secrets set JWT_SECRET=your_secret
-fly deploy
-```
-
----
-
-## Option 4: Railway (Free Credit)
-
-### Quick Deploy
-
+#### Setup Steps:
 1. Go to [railway.app](https://railway.app)
-2. Click "New Project" → "Deploy from GitHub"
+2. Click **"New Project"** → **"Deploy from GitHub"**
 3. Select your backend repo
 4. Add variables:
    ```
@@ -367,22 +223,22 @@ fly deploy
    PORT=3000
    ```
 5. Add Volume:
-   - Click your service → "Volumes" → "New Volume"
+   - Click service → **"Volumes"** → **"New Volume"**
    - Mount Path: `/app/data`
    - Size: `1 GB`
 6. Deploy!
+
+**Free Tier**: $5 credit/month (~500 hours)
 
 ---
 
 ## 🔧 Optimization for Free Tiers
 
 ### 1. Reduce Memory Usage
-
-Update `app/config.py`:
-
+Update `backend/app/config.py`:
 ```python
-# Use smaller embedding model
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"  # 80MB vs 400MB+
+# Use smaller embedding model (80MB vs 400MB+)
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 # Limit concurrent workers
 MAX_WORKERS = 2
@@ -393,11 +249,8 @@ CHUNK_OVERLAP = 50
 ```
 
 ### 2. Enable Caching
-
-Add Redis alternative (in-memory cache):
-
+Add simple in-memory cache in `backend/app/cache.py`:
 ```python
-# app/cache.py
 from functools import lru_cache
 import time
 
@@ -422,9 +275,8 @@ cache = SimpleCache(ttl=600)
 ```
 
 ### 3. Optimize Embedding Generation
-
+Use batch processing in embeddings service:
 ```python
-# Use batch processing
 def generate_embeddings_batch(texts, batch_size=32):
     embeddings = []
     for i in range(0, len(texts), batch_size):
@@ -438,11 +290,10 @@ def generate_embeddings_batch(texts, batch_size=32):
 ```
 
 ### 4. Compress Context
-
+Reduce chunk sizes for free tier:
 ```python
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-# Smaller chunks for free tier
 text_splitter = RecursiveCharacterTextSplitter(
     chunk_size=300,  # Reduced from 500
     chunk_overlap=30,  # Reduced from 50
@@ -452,67 +303,49 @@ text_splitter = RecursiveCharacterTextSplitter(
 
 ---
 
-## 📊 Monitoring & Keeping Alive
+## 📊 Preventing Sleep on Free Tiers
 
-### Prevent Sleep (Render Free Tier)
+### Render Free Tier (Sleeps after 15min inactivity)
 
-Create a simple uptime monitor:
-
-#### Using UptimeRobot (Free)
-
+#### Method 1: UptimeRobot (Recommended)
 1. Go to [uptimerobot.com](https://uptimerobot.com)
-2. Create account
+2. Create free account
 3. Add Monitor:
    - Type: HTTP(s)
    - URL: `https://your-app.onrender.com/health`
    - Interval: 5 minutes
 
-#### Custom Ping Script
+#### Method 2: GitHub Actions Ping
+Create `.github/workflows/keep-alive.yml`:
+```yaml
+name: Keep Render Alive
 
-```python
-# scripts/keep_alive.py
-import requests
-import time
-import os
+on:
+  schedule:
+    - cron: '*/4 * * * *'  # Every 4 minutes
+  workflow_dispatch:
 
-URL = os.getenv("BACKEND_URL", "https://your-app.onrender.com")
-
-while True:
-    try:
-        requests.get(f"{URL}/health", timeout=5)
-        print(f"Pinged {URL} at {time.strftime('%X')}")
-    except Exception as e:
-        print(f"Error: {e}")
-    time.sleep(240)  # Every 4 minutes
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render
+        run: curl https://your-app.onrender.com/health
 ```
 
-Run on free scheduler:
-- GitHub Actions (free 2000 min/month)
-- Cron-job.org (free 10 minute intervals)
+#### Method 3: Cron-job.org
+1. Go to [cron-job.org](https://cron-job.org)
+2. Create free account
+3. Add job:
+   - URL: `https://your-app.onrender.com/health`
+   - Interval: 4 minutes
 
 ---
 
-## 🎯 Complete Free Deployment Checklist
+## 🐛 Troubleshooting
 
-- [ ] Get Gemini API Key (free): [aistudio.google.com](https://aistudio.google.com/app/apikey)
-- [ ] Deploy backend on Render/HuggingFace
-- [ ] Add persistent disk for database
-- [ ] Set all environment variables
-- [ ] Deploy frontend on Vercel
-- [ ] Update frontend API URL
-- [ ] Test endpoint: `https://your-backend.com/health`
-- [ ] Test full flow: ingest → chat
-- [ ] Setup uptime monitor (prevent sleep)
-- [ ] Test with small website first
-- [ ] Monitor resource usage
-
----
-
-## 🐛 Troubleshooting Free Deployments
-
-### Issue: "Out of Memory"
-
-**Solution:**
+### Issue: "Out of Memory" Error
+**Solution**:
 ```bash
 # Reduce worker count
 export MAX_WORKERS=1
@@ -522,31 +355,29 @@ export EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
 ```
 
 ### Issue: "Timeout Error"
-
-**Solution:**
-```python
-# Increase timeout in FastAPI
-@app.post("/ingest", timeout=300)
-async def ingest_website(...):
-    # Process in background
-    pass
-```
+**Solution**:
+Increase timeout in FastAPI routes or process in background tasks.
 
 ### Issue: "Disk Full"
-
-**Solution:**
+**Solution**:
 ```bash
-# Clean old data
+# Clean old chroma data (via SSH or redeploy)
 rm -rf ./data/chroma_db/*
-# Or implement rotation
 ```
 
-### Issue: "Cold Start Too Slow"
-
-**Solution:**
+### Issue: "Cold Start Too Slow" (Render)
+**Solutions**:
 - Use uptime monitor to keep alive
 - Pre-warm endpoints
 - Reduce model size
+- Upgrade to Render Standard ($7/mo) for always-on
+
+### Issue: CORS Errors
+**Solution**:
+Ensure `CORS_ORIGINS` includes your frontend URL:
+```
+CORS_ORIGINS=https://your-frontend.vercel.app,http://localhost:3000
+```
 
 ---
 
@@ -554,38 +385,13 @@ rm -rf ./data/chroma_db/*
 
 | Service | Cost | Limits |
 |---------|------|--------|
-| **Vercel** | $0 | 100GB/mo, 100k requests/day |
-| **Render** | $0 | 750 hrs/mo, 512MB RAM |
+| **Vercel** | $0 | 100GB/mo bandwidth, 100k requests/day |
+| **Render** | $0 | 750 hrs/mo, 512MB RAM, sleeps after 15min |
 | **Gemini API** | $0 | 60 req/min, 1M tokens/day |
-| **Hugging Face** | $0 | CPU, 16GB RAM |
+| **Hugging Face** | $0 | CPU, 16GB RAM, public spaces |
+| **Fly.io** | $0 | 3x 256MB VMs always-on |
 | **SQLite + ChromaDB** | $0 | File-based, no limits |
 | **Total** | **$0/month** | ✅ |
-
----
-
-## 🚀 Quick Start Commands
-
-```bash
-# 1. Clone and setup
-git clone https://github.com/yourusername/rag-chatbot.git
-cd rag-chatbot
-
-# 2. Backend (Render)
-cd backend
-echo "GEMINI_API_KEY=your_key" >> .env
-echo "JWT_SECRET=$(openssl rand -hex 32)" >> .env
-git add . && git commit -m "Ready for Render"
-git push
-
-# 3. Frontend (Vercel)
-cd ../frontend
-echo "NEXT_PUBLIC_API_URL=https://your-app.onrender.com/api/v1" >> .env.production
-npm run build
-vercel --prod
-
-# 4. Test
-curl https://your-app.onrender.com/health
-```
 
 ---
 
@@ -599,6 +405,24 @@ When you outgrow free tiers:
 | Vercel Pro | $20/mo | More bandwidth, analytics |
 | Pinecone Starter | $25/mo | Managed vector DB |
 | Railway Pro | $5/mo | More compute hours |
+| Fly.io Paid | $5+/mo | More VMs, resources |
+
+---
+
+## ✅ Deployment Checklist
+
+- [ ] Get Gemini API Key: [aistudio.google.com](https://aistudio.google.com/app/apikey)
+- [ ] Deploy backend on Render/HuggingFace/Fly.io
+- [ ] Add persistent disk for database
+- [ ] Set all environment variables
+- [ ] Deploy frontend on Vercel
+- [ ] Update frontend API URL
+- [ ] Update backend CORS settings
+- [ ] Test endpoint: `https://your-backend.com/health`
+- [ ] Test full flow: ingest → chat
+- [ ] Setup uptime monitor (prevent sleep)
+- [ ] Test with small website first
+- [ ] Monitor resource usage
 
 ---
 
@@ -608,8 +432,18 @@ Your RAG chatbot is now deployed **100% free**!
 
 Test it by:
 1. Visiting your Vercel frontend URL
-2. Entering a website URL
-3. Asking questions
-4. Checking citations
+2. Entering a website URL (e.g., `https://example.com`)
+3. Asking questions about the content
+4. Checking citations and sources
 
 **Remember**: Free tiers have limitations. For production use with heavy traffic, consider upgrading to paid plans.
+
+---
+
+## 📚 Additional Resources
+
+- [Render Documentation](https://render.com/docs)
+- [Vercel Documentation](https://vercel.com/docs)
+- [Google Gemini API](https://ai.google.dev/docs)
+- [LangChain Documentation](https://python.langchain.com/docs)
+- [ChromaDB Documentation](https://docs.trychroma.com/)
